@@ -352,5 +352,5 @@ output "promtail-cert" {
 }
 
 output "iam_assumable_sa_loki-stack_out" {
-  value = iam_assumable_sa_loki-stack
+  value = module.iam_assumable_sa_loki-stack
 }

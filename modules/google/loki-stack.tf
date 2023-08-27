@@ -71,7 +71,7 @@ locals {
 }
 
 module "iam_assumable_sa_loki-stack" {
-  count      = local.loki-stack["enabled"] ? 1 : 0
+  count      = local.loki-stack["enabled"] && local.loki-stack["create_iam_resources"] ? 1 : 0
   source     = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
   version    = "~> 27.0"
   namespace  = local.loki-stack["namespace"]
@@ -80,7 +80,7 @@ module "iam_assumable_sa_loki-stack" {
 }
 
 module "loki-stack_bucket_iam" {
-  count   = local.loki-stack["enabled"] ? 1 : 0
+  count   = local.loki-stack["enabled"] && local.loki-stack["create_iam_resources"] ? 1 : 0
   source  = "terraform-google-modules/iam/google//modules/storage_buckets_iam"
   version = "~> 7.6"
 

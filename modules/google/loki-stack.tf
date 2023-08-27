@@ -350,3 +350,7 @@ output "promtail-cert" {
   value     = element(concat(tls_locally_signed_cert.promtail-cert[*].cert_pem, [""]), 0)
   sensitive = true
 }
+
+output "iam_assumable_sa_loki-stack_out" {
+  value = iam_assumable_sa_loki-stack
+}

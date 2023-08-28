@@ -13,6 +13,7 @@ locals {
       enabled                = false
       default_network_policy = true
       create_bucket          = true
+      prevent_destroy        = false
       bucket                 = "loki-store-${var.cluster-name}"
       bucket_lifecycle_rule  = []
       bucket_force_destroy   = false
@@ -175,6 +176,7 @@ module "loki-stack_kms_bucket" {
   location   = local.loki-stack["kms_bucket_location"]
   keyring    = "loki-stack"
   keys       = ["loki-stack"]
+  prevent_destroy = local.loki-stack["prevent_destroy"]
   owners = [
     "serviceAccount:${local.loki-stack["cloud_storage_service_account"]}"
   ]

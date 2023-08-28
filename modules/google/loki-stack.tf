@@ -175,7 +175,8 @@ module "loki-stack_kms_bucket" {
   project_id = var.project_id
   location   = local.loki-stack["kms_bucket_location"]
   keyring    = "loki-stack"
-  keys       = ["loki-stack"]
+  #keys       = ["loki-stack"]
+  keys       = ""
   prevent_destroy = local.loki-stack["prevent_destroy"]
   owners = [
     "serviceAccount:${local.loki-stack["cloud_storage_service_account"]}"

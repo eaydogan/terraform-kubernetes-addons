@@ -520,5 +520,5 @@ output "kube-prometheus-stack_sensitive" {
 
 
 output "kubernetes_priority_class_value" {
-  value = kubernetes_priority_class
+  value = kubernetes_priority_class.kubernetes_addons
 }

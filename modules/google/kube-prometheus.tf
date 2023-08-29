@@ -70,7 +70,7 @@ grafana:
         options:
           path: /var/lib/grafana/dashboards/default
 prometheus-node-exporter:
-  priorityClassName: ${local.priority-class-ds["create"] ? local.kubernetes_priority_class.kubernetes_addons_ds[0].metadata[0].name : ""}
+  priorityClassName: ${local.priority-class-ds["create"] ? kubernetes_priority_class.kubernetes_addons_ds[0].metadata[0].name : ""}
 prometheus:
   thanosService:
     enabled: ${local.thanos["enabled"]}
@@ -516,4 +516,8 @@ output "kube-prometheus-stack_sensitive" {
     grafana_password = element(concat(random_string.grafana_password.*.result, [""]), 0)
   }
   sensitive = true
+}
+
+output "kubernetes_priority_class_value" {
+  value = kubernetes_priority_class.kubernetes_addons
 }

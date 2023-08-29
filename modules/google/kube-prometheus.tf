@@ -252,7 +252,8 @@ module "iam_assumable_sa_kube-prometheus-stack_grafana" {
   source              = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
   version             = "~> 27.0"
   namespace           = local.kube-prometheus-stack["namespace"]
-  project_id          = var.project_id
+  #project_id          = var.project_id
+  project_id          = local.kube-prometheus-stack["project_id"]
   name                = local.kube-prometheus-stack["grafana_service_account_name"]
   use_existing_k8s_sa = local.kube-prometheus-stack["workload_identity_use_existing_k8s_sa"]
 }
@@ -262,7 +263,8 @@ module "iam_assumable_sa_kube-prometheus-stack_thanos" {
   source              = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
   version             = "~> 27.0"
   namespace           = local.kube-prometheus-stack["namespace"]
-  project_id          = var.project_id
+  #project_id          = var.project_id
+  project_id          = local.kube-prometheus-stack["project_id"]
   name                = "${local.kube-prometheus-stack["name_prefix"]}-thanos"
   use_existing_k8s_sa = local.kube-prometheus-stack["workload_identity_use_existing_k8s_sa"]
 }
@@ -302,7 +304,8 @@ module "kube-prometheus-stack_grafana-iam-member" {
   version = "~> 7.6"
 
   service_account_address = module.iam_assumable_sa_kube-prometheus-stack_grafana[0].gcp_service_account_email
-  project_id              = var.project_id
+  #project_id              = var.project_id
+  project_id          = local.kube-prometheus-stack["project_id"]
   project_roles = [
     "roles/monitoring.viewer",
     "roles/logging.viewer",
@@ -315,7 +318,8 @@ module "kube-prometheus-stack_thanos_kms_bucket" {
   source  = "terraform-google-modules/kms/google"
   version = "2.2.2"
 
-  project_id = var.project_id
+  #project_id = var.project_id
+  project_id = local.kube-prometheus-stack["project_id"]
   location   = local.kube-prometheus-stack["thanos_kms_bucket_location"]
   keyring    = "thanos"
   keys       = ["thanos"]
@@ -332,7 +336,8 @@ module "kube-prometheus-stack_kube-prometheus-stack_bucket" {
 
   source     = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
   version    = "~> 4.0"
-  project_id = var.project_id
+  #project_id = var.project_id
+  project_id = local.kube-prometheus-stack["project_id"]
   location   = local.kube-prometheus-stack["thanos_bucket_location"]
 
   name = local.kube-prometheus-stack["thanos_bucket"]

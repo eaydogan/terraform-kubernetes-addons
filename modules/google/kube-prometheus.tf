@@ -31,6 +31,7 @@ locals {
       manage_crds                           = true
       cloud_storage_service_account         = ""
       name_prefix                           = "kube-prometheus-stack"
+      project_id                            = ""
     },
     var.kube-prometheus-stack
   )
@@ -524,5 +525,5 @@ output "kubernetes_priority_class_value" {
 }
 
 output "project_id_out" {
-  value = var.project_id
+  value = local.kube-prometheus-stack["project_id"]
 }

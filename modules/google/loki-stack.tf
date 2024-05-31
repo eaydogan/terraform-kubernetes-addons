@@ -30,13 +30,6 @@ locals {
   values_loki-stack = <<-VALUES
     test:
       enabled: false
-    monitoring:
-      lokiCanary:
-        enabled: false
-      selfMonitoring:
-        enabled: false
-        grafanaAgent:
-          installOperator: false
     serviceMonitor:
       enabled: ${local.kube-prometheus-stack["enabled"] || local.victoria-metrics-k8s-stack["enabled"]}
     priorityClassName: ${local.priority-class["create"] ? kubernetes_priority_class.kubernetes_addons[0].metadata[0].name : ""}
@@ -73,7 +66,7 @@ locals {
 module "iam_assumable_sa_loki-stack" {
   count      = local.loki-stack["enabled"] ? 1 : 0
   source     = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version    = "~> 27.0"
+  version    = "~> 31.0"
   namespace  = local.loki-stack["namespace"]
   project_id = var.project_id
   name       = local.loki-stack["name"]
@@ -169,7 +162,7 @@ resource "helm_release" "loki-stack" {
 module "loki-stack_kms_bucket" {
   count   = local.loki-stack["enabled"] && local.loki-stack["create_bucket"] ? 1 : 0
   source  = "terraform-google-modules/kms/google"
-  version = "2.2.2"
+  version = "~> 2.2"
 
   project_id = var.project_id
   location   = local.loki-stack["kms_bucket_location"]
@@ -187,7 +180,7 @@ module "loki-stack_bucket" {
   count = local.loki-stack["enabled"] && local.loki-stack["create_bucket"] ? 1 : 0
 
   source     = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
-  version    = "~> 4.0"
+  version    = "~> 6.0"
   project_id = var.project_id
   location   = local.loki-stack["bucket_location"]
 

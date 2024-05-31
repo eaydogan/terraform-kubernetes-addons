@@ -10,7 +10,7 @@ locals {
       service_account_name      = "cluster-autoscaler"
       create_iam_resources_irsa = true
       enabled                   = false
-      version                   = "v1.21.1"
+      version                   = "v1.28.0"
       iam_policy_override       = null
       default_network_policy    = true
       name_prefix               = "${var.cluster-name}-cluster-autoscaler"
@@ -75,9 +75,13 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
       "autoscaling:DescribeAutoScalingGroups",
       "autoscaling:DescribeAutoScalingInstances",
       "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
       "autoscaling:DescribeTags",
       "ec2:DescribeInstanceTypes",
       "ec2:DescribeLaunchTemplateVersions",
+      "ec2:DescribeImages",
+      "ec2:GetInstanceTypesFromInstanceRequirements",
+      "eks:DescribeNodegroup"
     ]
 
     resources = ["*"]
@@ -90,7 +94,6 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
     actions = [
       "autoscaling:SetDesiredCapacity",
       "autoscaling:TerminateInstanceInAutoScalingGroup",
-      "autoscaling:UpdateAutoScalingGroup",
     ]
 
     resources = ["*"]

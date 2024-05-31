@@ -14,11 +14,12 @@ locals {
       thanos_create_iam_resources_irsa  = true
       thanos_iam_policy_override        = null
       thanos_sidecar_enabled            = false
+      thanos_dashboard_enabled          = true
       thanos_create_bucket              = true
       thanos_bucket                     = "thanos-store-${var.cluster-name}"
       thanos_bucket_force_destroy       = false
       thanos_store_config               = null
-      thanos_version                    = "v0.31.0"
+      thanos_version                    = "v0.34.1"
       enabled                           = false
       allowed_cidrs                     = ["0.0.0.0/0"]
       default_network_policy            = true
@@ -203,15 +204,18 @@ grafana:
 VALUES
 
   values_thanos_sidecar = <<VALUES
+prometheusOperator:
+  thanosImage:
+    tag: "${local.kube-prometheus-stack["thanos_version"]}"
 prometheus:
   prometheusSpec:
     externalLabels:
       cluster: ${var.cluster-name}
     thanos:
-      version: "${local.kube-prometheus-stack["thanos_version"]}"
       objectStorageConfig:
-        key: thanos.yaml
-        name: "${local.kube-prometheus-stack["thanos_bucket"]}-config"
+        existingSecret:
+          key: thanos.yaml
+          name: "${local.kube-prometheus-stack["thanos_bucket"]}-config"
 VALUES
 
   values_grafana_ds = <<VALUES
@@ -359,18 +363,6 @@ data "aws_iam_policy_document" "kube-prometheus-stack_grafana" {
 
     resources = ["*"]
   }
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "ec2:DescribeTags",
-      "ec2:DescribeInstances",
-      "ec2:DescribeRegions"
-    ]
-
-    resources = ["*"]
-
-  }
 }
 
 data "aws_iam_policy_document" "kube-prometheus-stack_thanos" {
@@ -399,7 +391,7 @@ module "kube-prometheus-stack_thanos_bucket" {
   create_bucket = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_sidecar_enabled"] && local.kube-prometheus-stack["thanos_create_bucket"]
 
   source  = "terraform-aws-modules/s3-bucket/aws"
-  version = "~> 3.0"
+  version = "~> 4.0"
 
   control_object_ownership = true
   object_ownership         = "ObjectWriter"
@@ -482,7 +474,7 @@ resource "helm_release" "kube-prometheus-stack" {
     local.cert-manager["enabled"] ? local.values_dashboard_cert-manager : null,
     local.cluster-autoscaler["enabled"] ? local.values_dashboard_cluster-autoscaler : null,
     local.ingress-nginx["enabled"] ? local.values_dashboard_ingress-nginx : null,
-    local.thanos["enabled"] ? local.values_dashboard_thanos : null,
+    local.thanos["enabled"] && local.kube-prometheus-stack["thanos_dashboard_enabled"] ? local.values_dashboard_thanos : null,
     local.values_dashboard_node_exporter,
     local.kube-prometheus-stack["thanos_sidecar_enabled"] ? local.values_thanos_sidecar : null,
     local.kube-prometheus-stack["thanos_sidecar_enabled"] ? local.values_grafana_ds : null,

@@ -27,6 +27,11 @@ locals {
     var.thanos
   )
 
+  thanos_bucket = (
+    local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? module.kube-prometheus-stack_kube-prometheus-stack_bucket[0].name :
+    local.thanos["create_bucket"] ? module.thanos_bucket[0] : local.thanos["bucket"]
+  )
+
   values_thanos = <<-VALUES
     receive:
       enabled: false
@@ -170,7 +175,7 @@ locals {
     objstoreConfig:
       type: GCS
       config:
-        bucket: ${local.thanos["bucket"]}
+        bucket: ${local.thanos_bucket}
     VALUES
 
   values_thanos_global_requests = <<-VALUES
@@ -219,7 +224,7 @@ locals {
 module "iam_assumable_sa_thanos" {
   count      = local.thanos["enabled"] ? 1 : 0
   source     = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version    = "~> 27.0"
+  version    = "~> 31.0"
   namespace  = local.thanos["namespace"]
   project_id = var.project_id
   name       = local.thanos["name"]
@@ -228,7 +233,7 @@ module "iam_assumable_sa_thanos" {
 module "iam_assumable_sa_thanos-compactor" {
   count      = local.thanos["enabled"] ? 1 : 0
   source     = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version    = "~> 27.0"
+  version    = "~> 31.0"
   namespace  = local.thanos["namespace"]
   project_id = var.project_id
   name       = "${local.thanos["name"]}-compactor"
@@ -237,7 +242,7 @@ module "iam_assumable_sa_thanos-compactor" {
 module "iam_assumable_sa_thanos-sg" {
   count      = local.thanos["enabled"] ? 1 : 0
   source     = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version    = "~> 27.0"
+  version    = "~> 31.0"
   namespace  = local.thanos["namespace"]
   project_id = var.project_id
   name       = "${local.thanos["name"]}-sg"
@@ -247,7 +252,7 @@ module "thanos_bucket" {
   count = local.thanos["enabled"] && local.thanos["create_bucket"] ? 1 : 0
 
   source     = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
-  version    = "~> 4.0"
+  version    = "~> 6.0"
   project_id = var.project_id
   location   = local.thanos["bucket_location"]
 
@@ -262,7 +267,7 @@ module "thanos_bucket" {
 module "thanos_kms_bucket" {
   count   = local.thanos["enabled"] && local.thanos["create_bucket"] ? 1 : 0
   source  = "terraform-google-modules/kms/google"
-  version = "2.2.2"
+  version = "~> 2.2"
 
   project_id = var.project_id
   location   = local.thanos["kms_bucket_location"]
@@ -276,25 +281,56 @@ module "thanos_kms_bucket" {
   ]
 }
 
-module "thanos_bucket_iam" {
-  count   = local.thanos["enabled"] ? 1 : 0
-  source  = "terraform-google-modules/iam/google//modules/storage_buckets_iam"
-  version = "~> 7.6"
+# GCS permissions for thanos service account
+resource "google_storage_bucket_iam_member" "thanos_gcs_iam_objectViewer_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos[0].gcp_service_account_email}"
+}
 
-  mode            = "additive"
-  storage_buckets = [local.thanos["bucket"]]
-  bindings = {
-    "roles/storage.objectViewer" = [
-      "serviceAccount:${module.iam_assumable_sa_thanos[0].gcp_service_account_email}",
-      "serviceAccount:${module.iam_assumable_sa_thanos-compactor[0].gcp_service_account_email}",
-      "serviceAccount:${module.iam_assumable_sa_thanos-sg[0].gcp_service_account_email}",
-    ]
-    "roles/storage.objectCreator" = [
-      "serviceAccount:${module.iam_assumable_sa_thanos[0].gcp_service_account_email}",
-      "serviceAccount:${module.iam_assumable_sa_thanos-compactor[0].gcp_service_account_email}",
-      "serviceAccount:${module.iam_assumable_sa_thanos-sg[0].gcp_service_account_email}",
-    ]
-  }
+resource "google_storage_bucket_iam_member" "thanos_gcs_iam_objectCreator_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos[0].gcp_service_account_email}"
+}
+
+# GCS permissions for thanos compactor service account
+resource "google_storage_bucket_iam_member" "thanos_compactor_gcs_iam_objectViewer_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos-compactor[0].gcp_service_account_email}"
+}
+
+resource "google_storage_bucket_iam_member" "thanos_compactor_gcs_iam_objectCreator_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos-compactor[0].gcp_service_account_email}"
+}
+
+resource "google_storage_bucket_iam_member" "thanos_compactor_gcs_iam_legacyBucketWriter_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.legacyBucketWriter"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos-compactor[0].gcp_service_account_email}"
+}
+
+# GCS permissions for thanos storage gateway service account
+resource "google_storage_bucket_iam_member" "thanos_sg_gcs_iam_objectViewer_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos-sg[0].gcp_service_account_email}"
+}
+
+resource "google_storage_bucket_iam_member" "thanos_sg_gcs_iam_objectCreator_permissions" {
+  count  = local.thanos["enabled"] ? 1 : 0
+  bucket = local.thanos_bucket
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${module.iam_assumable_sa_thanos-sg[0].gcp_service_account_email}"
 }
 
 resource "kubernetes_namespace" "thanos" {

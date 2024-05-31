@@ -15,13 +15,14 @@ locals {
       thanos_create_iam_resources           = true
       thanos_iam_policy_override            = null
       thanos_sidecar_enabled                = false
+      thanos_dashboard_enabled              = true
       thanos_create_bucket                  = true
       thanos_bucket                         = "thanos-store-${var.cluster-name}"
       thanos_bucket_force_destroy           = false
       thanos_bucket_location                = ""
       thanos_kms_bucket_location            = ""
       thanos_store_config                   = null
-      thanos_version                        = "v0.30.0"
+      thanos_version                        = "v0.34.1"
       thanos_service_account                = ""
       enabled                               = false
       allowed_cidrs                         = ["0.0.0.0/0"]
@@ -41,6 +42,8 @@ kubeScheduler:
 kubeControllerManager:
   enabled: false
 kubeEtcd:
+  enabled: false
+coreDns:
   enabled: false
 grafana:
   sidecar:
@@ -187,15 +190,18 @@ grafana:
 VALUES
 
   values_thanos_sidecar = <<VALUES
+prometheusOperator:
+  thanosImage:
+    tag: "${local.kube-prometheus-stack["thanos_version"]}"
 prometheus:
   prometheusSpec:
     externalLabels:
       cluster: ${var.cluster-name}
     thanos:
-      version: "${local.kube-prometheus-stack["thanos_version"]}"
       objectStorageConfig:
-        key: thanos.yaml
-        name: "${local.kube-prometheus-stack["thanos_bucket"]}-config"
+        existingSecret:
+          key: thanos.yaml
+          name: "${local.kube-prometheus-stack["thanos_bucket"]}-config"
 VALUES
 
   values_grafana_ds = <<VALUES
@@ -249,7 +255,7 @@ VALUES
 module "iam_assumable_sa_kube-prometheus-stack_grafana" {
   count               = local.kube-prometheus-stack["enabled"] ? 1 : 0
   source              = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version             = "~> 27.0"
+  version             = "~> 31.0"
   namespace           = local.kube-prometheus-stack["namespace"]
   project_id          = var.project_id
   name                = local.kube-prometheus-stack["grafana_service_account_name"]
@@ -259,7 +265,7 @@ module "iam_assumable_sa_kube-prometheus-stack_grafana" {
 module "iam_assumable_sa_kube-prometheus-stack_thanos" {
   count               = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_sidecar_enabled"] ? 1 : 0
   source              = "terraform-google-modules/kubernetes-engine/google//modules/workload-identity"
-  version             = "~> 27.0"
+  version             = "~> 31.0"
   namespace           = local.kube-prometheus-stack["namespace"]
   project_id          = var.project_id
   name                = "${local.kube-prometheus-stack["name_prefix"]}-thanos"
@@ -278,21 +284,18 @@ resource "kubernetes_secret" "kube-prometheus-stack_thanos" {
   }
 }
 
-module "kube-prometheus-stack_thanos_bucket_iam" {
-  count   = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? 1 : 0
-  source  = "terraform-google-modules/iam/google//modules/storage_buckets_iam"
-  version = "~> 7.6"
+resource "google_storage_bucket_iam_member" "kube_prometheus_stack_thanos_bucket_objectViewer_iam_permission" {
+  count  = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? 1 : 0
+  bucket = module.kube-prometheus-stack_kube-prometheus-stack_bucket[0].name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${module.iam_assumable_sa_kube-prometheus-stack_thanos[0].gcp_service_account_email}"
+}
 
-  mode            = "additive"
-  storage_buckets = [module.kube-prometheus-stack_kube-prometheus-stack_bucket[0].name]
-  bindings = {
-    "roles/storage.objectViewer" = [
-      "serviceAccount:${module.iam_assumable_sa_kube-prometheus-stack_thanos[0].gcp_service_account_email}"
-    ]
-    "roles/storage.objectAdmin" = [
-      "serviceAccount:${module.iam_assumable_sa_kube-prometheus-stack_thanos[0].gcp_service_account_email}"
-    ]
-  }
+resource "google_storage_bucket_iam_member" "kube_prometheus_stack_thanos_bucket_objectAdmin_iam_permission" {
+  count  = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? 1 : 0
+  bucket = module.kube-prometheus-stack_kube-prometheus-stack_bucket[0].name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.iam_assumable_sa_kube-prometheus-stack_thanos[0].gcp_service_account_email}"
 }
 
 module "kube-prometheus-stack_grafana-iam-member" {
@@ -312,7 +315,7 @@ module "kube-prometheus-stack_grafana-iam-member" {
 module "kube-prometheus-stack_thanos_kms_bucket" {
   count   = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? 1 : 0
   source  = "terraform-google-modules/kms/google"
-  version = "2.2.2"
+  version = "~> 2.2"
 
   project_id = var.project_id
   location   = local.kube-prometheus-stack["thanos_kms_bucket_location"]
@@ -330,7 +333,7 @@ module "kube-prometheus-stack_kube-prometheus-stack_bucket" {
   count = local.kube-prometheus-stack["enabled"] && local.kube-prometheus-stack["thanos_create_bucket"] ? 1 : 0
 
   source     = "terraform-google-modules/cloud-storage/google//modules/simple_bucket"
-  version    = "~> 4.0"
+  version    = "~> 6.0"
   project_id = var.project_id
   location   = local.kube-prometheus-stack["thanos_bucket_location"]
 
@@ -384,7 +387,7 @@ resource "helm_release" "kube-prometheus-stack" {
   values = compact([
     local.values_kube-prometheus-stack,
     local.ingress-nginx["enabled"] ? local.values_dashboard_ingress-nginx : null,
-    local.thanos["enabled"] ? local.values_dashboard_thanos : null,
+    local.thanos["enabled"] && local.kube-prometheus-stack["thanos_dashboard_enabled"] ? local.values_dashboard_thanos : null,
     local.values_dashboard_node_exporter,
     local.kube-prometheus-stack["thanos_sidecar_enabled"] ? local.values_thanos_sidecar : null,
     local.kube-prometheus-stack["thanos_sidecar_enabled"] ? local.values_grafana_ds : null,

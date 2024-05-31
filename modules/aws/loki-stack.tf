@@ -28,13 +28,6 @@ locals {
   values_loki-stack = <<-VALUES
     test:
       enabled: false
-    monitoring:
-      lokiCanary:
-        enabled: false
-      selfMonitoring:
-        enabled: false
-        grafanaAgent:
-          installOperator: false
     serviceMonitor:
       enabled: ${local.kube-prometheus-stack["enabled"] || local.victoria-metrics-k8s-stack["enabled"]}
     priorityClassName: ${local.priority-class["create"] ? kubernetes_priority_class.kubernetes_addons[0].metadata[0].name : ""}
@@ -186,7 +179,7 @@ module "loki_bucket" {
   create_bucket = local.loki-stack["enabled"] && local.loki-stack["create_bucket"]
 
   source  = "terraform-aws-modules/s3-bucket/aws"
-  version = "~> 3.0"
+  version = "~> 4.0"
 
   control_object_ownership = true
   object_ownership         = "ObjectWriter"

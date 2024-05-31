@@ -70,7 +70,7 @@ module "cert_manager_workload_identity" {
 # to deal with Cloud DNS. The IAM permissions will be set at the resource level (DNS zone) and not at the project
 # level.
 resource "google_dns_managed_zone_iam_member" "cert_manager_cloud_dns_iam_permissions" {
-  count        = local.acme_dns01_enabled && local.cert-manager.create_iam_resources && local.cert-manager.enabled ? 1 : 0
+  count        = local.cert-manager.acme_dns01_enabled && local.cert-manager.create_iam_resources && local.cert-manager.enabled ? 1 : 0
   project      = local.cert-manager.project_id
   managed_zone = local.cert-manager.managed_zone
   role         = "roles/dns.admin"
